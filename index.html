@@ -486,20 +486,6 @@
       justify-content: center;
     }
     .lightbox-close:hover { background: rgba(255,255,255,0.3); }
-    .connection-status {
-      position: absolute;
-      bottom: 16px;
-      left: 16px;
-      font-size: 10px;
-      padding: 4px 10px;
-      border-radius: 20px;
-      background: rgba(0,0,0,0.6);
-      z-index: 1000;
-      pointer-events: none;
-    }
-    .connection-status.connected { color: #4caf50; }
-    .connection-status.disconnected { color: #f44336; }
-    .connection-status.reconnecting { color: #ff9800; }
   </style>
 </head>
 <body>
@@ -521,7 +507,6 @@
 
   <div class="drop-overlay" id="dropOverlay">📷 Drop image to send</div>
   <span class="help-link" id="helpLink">How to use</span>
-  <div class="connection-status connected" id="connectionStatus">● Connected</div>
 
   <div class="popup-overlay" id="helpOverlay">
     <div class="popup">
@@ -597,7 +582,7 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
-    import { getDatabase, ref, push, onValue, off, get, set, remove, serverTimestamp, update, onDisconnect, runTransaction, goOffline, goOnline } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-database.js";
+    import { getDatabase, ref, push, onValue, off, get, set, remove, serverTimestamp, update, onDisconnect, runTransaction } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyBjHNXtaaW2SQloN5j3_3Lg4vTJnDKhcSo",
@@ -620,125 +605,6 @@
     const inputBlueToggle = document.getElementById('inputBlueToggle');
     const websiteTitle = document.getElementById('websiteTitle');
     const favicon = document.getElementById('favicon');
-    const connectionStatusDiv = document.getElementById('connectionStatus');
-
-    // ========== CONNECTION MONITORING & AUTO-RECONNECT ==========
-    let reconnectAttempts = 0;
-    let heartbeatInterval = null;
-    let lastMessageReceived = Date.now();
-    let connectionMonitorInterval = null;
-    let currentConnectionRef = null;
-    let isManuallyReconnecting = false;
-
-    function updateConnectionStatus(status, isConnected) {
-      connectionStatusDiv.className = `connection-status ${status}`;
-      if (isConnected) {
-        connectionStatusDiv.innerHTML = '● Connected';
-        reconnectAttempts = 0;
-      } else if (status === 'reconnecting') {
-        connectionStatusDiv.innerHTML = '⟳ Reconnecting...';
-      } else {
-        connectionStatusDiv.innerHTML = '○ Disconnected';
-      }
-    }
-
-    // Force reconnection by toggling offline/online
-    async function forceReconnect() {
-      if (isManuallyReconnecting) return;
-      isManuallyReconnecting = true;
-      console.log('Force reconnecting Firebase...');
-      updateConnectionStatus('reconnecting', false);
-      
-      try {
-        goOffline(database);
-        await new Promise(resolve => setTimeout(resolve, 500));
-        goOnline(database);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        console.log('Firebase reconnected');
-      } catch (e) {
-        console.warn('Reconnect attempt failed:', e);
-      } finally {
-        isManuallyReconnecting = false;
-      }
-    }
-
-    // Heartbeat ping to keep connection alive
-    function startHeartbeat() {
-      if (heartbeatInterval) clearInterval(heartbeatInterval);
-      heartbeatInterval = setInterval(() => {
-        if (currentConnectionRef) {
-          // Ping the .info/connected reference to keep WebSocket alive
-          get(currentConnectionRef).catch(() => {});
-        }
-      }, 15000); // Ping every 15 seconds
-    }
-
-    function stopHeartbeat() {
-      if (heartbeatInterval) {
-        clearInterval(heartbeatInterval);
-        heartbeatInterval = null;
-      }
-    }
-
-    // Monitor for connection stalls (no message received for 30 seconds)
-    function startConnectionMonitor() {
-      if (connectionMonitorInterval) clearInterval(connectionMonitorInterval);
-      connectionMonitorInterval = setInterval(() => {
-        const timeSinceLastMsg = Date.now() - lastMessageReceived;
-        if (timeSinceLastMsg > 35000 && reconnectAttempts < 5) {
-          console.warn('No messages received for 35s, forcing reconnect');
-          reconnectAttempts++;
-          forceReconnect();
-        } else if (timeSinceLastMsg > 35000) {
-          updateConnectionStatus('disconnected', false);
-        }
-      }, 10000);
-    }
-
-    function stopConnectionMonitor() {
-      if (connectionMonitorInterval) {
-        clearInterval(connectionMonitorInterval);
-        connectionMonitorInterval = null;
-      }
-    }
-
-    // Track when messages are received to detect stalls
-    function markMessageReceived() {
-      lastMessageReceived = Date.now();
-      if (!connectionStatusDiv.classList.contains('connected')) {
-        updateConnectionStatus('connected', true);
-      }
-    }
-
-    // Set up connection listener
-    function setupConnectionListener() {
-      currentConnectionRef = ref(database, '.info/connected');
-      onValue(currentConnectionRef, (snap) => {
-        const connected = snap.val() === true;
-        if (connected) {
-          console.log('Firebase connected');
-          updateConnectionStatus('connected', true);
-          lastMessageReceived = Date.now();
-          reconnectAttempts = 0;
-        } else {
-          console.log('Firebase disconnected');
-          updateConnectionStatus('disconnected', false);
-          // Auto reconnect after 2 seconds
-          setTimeout(() => {
-            if (!isManuallyReconnecting) {
-              forceReconnect();
-            }
-          }, 2000);
-        }
-      });
-    }
-
-    // Start connection management
-    setupConnectionListener();
-    startHeartbeat();
-    startConnectionMonitor();
-
-    // ========== END CONNECTION FIXES ==========
 
     const chatEnabledRef = ref(database, 'settings/chatEnabled');
     let chatDraft = '';
@@ -1186,25 +1052,10 @@
       onValue(messagesRef, (snapshot) => {
         lastSnapshot = snapshot;
         if (!renaming) redrawMessages();
-        markMessageReceived(); // Track message receipt to detect connection stalls
       });
     }
 
     renderMessages();
-
-    // Wrap push to ensure connection is active before sending
-    async function safePushMessage(msgData) {
-      try {
-        const result = await push(messagesRef, msgData);
-        markMessageReceived();
-        return result;
-      } catch (error) {
-        console.warn('Push failed, attempting reconnect:', error);
-        await forceReconnect();
-        // Retry once after reconnect
-        return await push(messagesRef, msgData);
-      }
-    }
 
     function sendMessage() {
       if (messageInput.disabled) return;
@@ -1215,7 +1066,7 @@
         pendingImages.forEach(dataUrl => {
           const msgData = { text: dataUrl, sender: currentUsername, timestamp: serverTimestamp(), userId, isImage: true };
           if (replyTo) msgData.replyTo = replyTo;
-          safePushMessage(msgData);
+          push(messagesRef, msgData);
         });
         clearPendingImages();
         clearReply();
@@ -1228,7 +1079,7 @@
       const userId = localStorage.getItem('chatUserId');
       const msgData = { text, sender: currentUsername, timestamp: serverTimestamp(), userId };
       if (replyTo) msgData.replyTo = replyTo;
-      safePushMessage(msgData);
+      push(messagesRef, msgData);
       messageInput.value = '';
       clearReply();
       messageInput.focus();
@@ -1247,12 +1098,14 @@
       channelInput.dispatchEvent(new Event('blur'));
     }
 
+    // UPDATED: Higher quality image resizing - larger max dimension and better quality
     function resizeImageToBase64(file, maxPx = 1200, quality = 0.9) {
       return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onload = (e) => {
           const img = new Image();
           img.onload = () => {
+            // Calculate scale to fit within maxPx while maintaining aspect ratio
             let width = img.width;
             let height = img.height;
             
@@ -1271,6 +1124,7 @@
             canvas.height = Math.round(height);
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            // Use JPEG with high quality for better clarity
             resolve(canvas.toDataURL('image/jpeg', quality));
           };
           img.src = e.target.result;

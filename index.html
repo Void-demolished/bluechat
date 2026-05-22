@@ -987,7 +987,7 @@
     document.getElementById('helpClose').addEventListener('click', closePopup);
     document.getElementById('helpOverlay').addEventListener('click', (e) => { if (e.target === document.getElementById('helpOverlay')) closePopup(); });
 
-    setInterval(loadMessages, 150);
+    setInterval(loadMessages, 10000);
     loadMessages();
   </script>
 </body>

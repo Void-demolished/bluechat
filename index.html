@@ -818,6 +818,7 @@
       localStorage.setItem('chatChannel', currentChannel);
       messagesRef = ref(database, `channels/${currentChannel}/messages`);
       lastSnapshot = null;
+      lastPollKey = null;
       clearReply();
 
       await remove(ref(database, `channels/${oldChannel}/presence/${myUserId}`));
@@ -1062,18 +1063,19 @@
 
     renderMessages();
 
-    let lastPollSize = -1;
+    let lastPollKey = null;
     setInterval(async () => {
       try {
         const snap = await get(messagesRef);
-        const size = snap.exists() ? snap.size : 0;
-        if (size !== lastPollSize) {
-          lastPollSize = size;
+        let newestKey = null;
+        if (snap.exists()) snap.forEach(c => { newestKey = c.key; });
+        if (newestKey !== lastPollKey) {
+          lastPollKey = newestKey;
           lastSnapshot = snap;
           if (!renaming) redrawMessages();
         }
       } catch (e) {}
-    }, 2000);
+    }, 1500);
 
     function sendMessage() {
       if (messageInput.disabled) return;

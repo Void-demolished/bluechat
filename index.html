@@ -761,6 +761,7 @@
         if (Object.keys(updates).length > 0) await update(ref(database), updates);
         lastSnapshot = await get(messagesRef);
         renaming = false; replyTo = savedReply; redrawMessages();
+        sendPing();
       } catch (error) {
         currentUsername = oldUsername; nameInput.value = oldUsername;
         setChanUsername(currentChannel, oldUsername);

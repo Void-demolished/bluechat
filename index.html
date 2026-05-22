@@ -502,7 +502,7 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
-    import { getDatabase, ref, push, onValue, off, get, set, remove, serverTimestamp, update, onDisconnect, runTransaction } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-database.js";
+    import { getDatabase, ref, push, get, set, remove, serverTimestamp, update, onDisconnect, runTransaction } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyBjHNXtaaW2SQloN5j3_3Lg4vTJnDKhcSo",
@@ -530,8 +530,12 @@
 
     const chatEnabledRef = ref(database, 'settings/chatEnabled');
     let chatDraft = '';
-    onValue(chatEnabledRef, (snap) => {
+    let chatEnabled = true;
+    
+    async function checkChatEnabled() {
+      const snap = await get(chatEnabledRef);
       const enabled = snap.exists() ? snap.val() : true;
+      chatEnabled = enabled;
       if (!enabled) {
         chatDraft = messageInput.value;
         messageInput.value = '';
@@ -549,7 +553,9 @@
         nameInput.style.opacity = '';
         nameInput.style.cursor = '';
       }
-    });
+    }
+    checkChatEnabled();
+    setInterval(checkChatEnabled, 3000);
 
     function getChanUsername(channel) { return localStorage.getItem(`chatUsername_${channel}`); }
     function setChanUsername(channel, name) { localStorage.setItem(`chatUsername_${channel}`, name); }
@@ -574,7 +580,6 @@
     nameInput.value = currentUsername;
 
     let messagesRef = ref(database, `channels/${currentChannel}/messages`);
-    let pingRef = ref(database, `channels/${currentChannel}/ping`);
 
     const myUserId = localStorage.getItem('chatUserId');
     let presenceRef = ref(database, `channels/${currentChannel}/presence/${myUserId}`);
@@ -663,22 +668,17 @@
       }
 
       nameInput.value = currentUsername;
-      off(messagesRef);
-      off(pingRef);
       const oldChannel = currentChannel;
       currentChannel = newChannel;
       localStorage.setItem('chatChannel', currentChannel);
       messagesRef = ref(database, `channels/${currentChannel}/messages`);
-      pingRef = ref(database, `channels/${currentChannel}/ping`);
-      lastSnapshot = null;
-      lastPollKey = null;
       clearReply();
 
       await remove(ref(database, `channels/${oldChannel}/presence/${myUserId}`));
       presenceRef = ref(database, `channels/${currentChannel}/presence/${myUserId}`);
       onDisconnect(presenceRef).remove();
 
-      renderMessages();
+      await loadMessages();
     }
 
     const replyBar = document.getElementById('replyBar');
@@ -740,33 +740,23 @@
       const oldUsername = currentUsername;
       currentUsername = newName;
       setChanUsername(currentChannel, newName);
-      renaming = true;
-      const savedReply = replyTo;
-      redrawMessages(oldUsername);
-
-      try {
-        const snapshot = await get(messagesRef);
-        const updates = {};
-        snapshot.forEach((msgSnapshot) => {
-          const message = msgSnapshot.val();
-          if (message.userId === myUserId || (!message.userId && message.sender === oldUsername)) {
-            updates[`channels/${currentChannel}/messages/${msgSnapshot.key}`] = {
-              text: message.text, sender: newName, timestamp: message.timestamp, userId: myUserId,
-              ...(message.replyTo && { replyTo: message.replyTo }),
-              ...(message.isImage && { isImage: true })
-            };
-          }
-        });
-        updates[`channels/${currentChannel}/presence/${myUserId}`] = { username: newName, userId: myUserId };
-        if (Object.keys(updates).length > 0) await update(ref(database), updates);
-        lastSnapshot = await get(messagesRef);
-        renaming = false; replyTo = savedReply; redrawMessages();
-        await set(pingRef, serverTimestamp());
-      } catch (error) {
-        currentUsername = oldUsername; nameInput.value = oldUsername;
-        setChanUsername(currentChannel, oldUsername);
-        renaming = false; replyTo = savedReply; redrawMessages();
-      }
+      
+      const snapshot = await get(messagesRef);
+      const updates = {};
+      snapshot.forEach((msgSnapshot) => {
+        const message = msgSnapshot.val();
+        if (message.userId === myUserId || (!message.userId && message.sender === oldUsername)) {
+          updates[`channels/${currentChannel}/messages/${msgSnapshot.key}`] = {
+            text: message.text, sender: newName, timestamp: message.timestamp, userId: myUserId,
+            ...(message.replyTo && { replyTo: message.replyTo }),
+            ...(message.isImage && { isImage: true })
+          };
+        }
+      });
+      updates[`channels/${currentChannel}/presence/${myUserId}`] = { username: newName, userId: myUserId };
+      if (Object.keys(updates).length > 0) await update(ref(database), updates);
+      
+      await loadMessages();
     }
 
     document.addEventListener('keydown', function(e) {
@@ -786,18 +776,12 @@
       return new Date(ts).toLocaleTimeString('en-US', { timeZone: 'Australia/Brisbane', hour12: false, hour: '2-digit', minute: '2-digit' });
     }
 
-    let lastSnapshot = null;
-    let renaming = false;
-    let lastPollKey = null;
+    let currentMessages = [];
 
-    function redrawMessages(displayName) {
-      if (!lastSnapshot) return;
-      const name = displayName || currentUsername;
+    function redrawMessages() {
       messagesDiv.innerHTML = '';
-      lastSnapshot.forEach((childSnapshot) => {
-        const message = childSnapshot.val();
-        const msgKey = childSnapshot.key;
-        const isUser = message.userId === myUserId || (!message.userId && (message.sender === name || message.sender === currentUsername));
+      currentMessages.forEach(({ message, msgKey }) => {
+        const isUser = message.userId === myUserId || (!message.userId && message.sender === currentUsername);
         const container = document.createElement('div');
         container.classList.add('message-wrapper');
         container.dataset.msgKey = msgKey;
@@ -861,68 +845,55 @@
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
 
-    async function pollOnce() {
+    async function loadMessages() {
+      if (!chatEnabled) return;
       try {
-        const snap = await get(messagesRef);
-        let newestKey = null;
-        if (snap.exists()) snap.forEach(c => { newestKey = c.key; });
-        if (newestKey !== lastPollKey) {
-          lastPollKey = newestKey;
-          lastSnapshot = snap;
-          if (!renaming) redrawMessages();
+        const snapshot = await get(messagesRef);
+        const messages = [];
+        if (snapshot.exists()) {
+          snapshot.forEach((child) => {
+            messages.push({ message: child.val(), msgKey: child.key });
+          });
         }
-      } catch (e) {}
+        currentMessages = messages;
+        redrawMessages();
+      } catch (e) {
+        console.error("Error loading messages:", e);
+      }
     }
 
-    function renderMessages() {
-      messagesDiv.innerHTML = '';
-      onValue(messagesRef, (snapshot) => {
-        lastSnapshot = snapshot;
-        if (!renaming) redrawMessages();
-      });
-      onValue(pingRef, () => { pollOnce(); });
-    }
-
-    renderMessages();
-
-    setInterval(pollOnce, 150);
-
-    function sendPing() {
-      set(ref(database, `channels/${currentChannel}/ping`), serverTimestamp()).catch(() => {});
-    }
-
-    function sendMessage() {
-      if (messageInput.disabled) return;
+    async function sendMessage() {
+      if (messageInput.disabled || !chatEnabled) return;
       const text = messageInput.value.trim();
 
       if (pendingImages.length > 0) {
-        const userId = localStorage.getItem('chatUserId');
-        pendingImages.forEach(dataUrl => {
-          const msgData = { text: dataUrl, sender: currentUsername, timestamp: serverTimestamp(), userId, isImage: true };
+        for (const dataUrl of pendingImages) {
+          const msgData = { text: dataUrl, sender: currentUsername, timestamp: serverTimestamp(), userId: myUserId, isImage: true };
           if (replyTo) msgData.replyTo = replyTo;
-          push(messagesRef, msgData);
-        });
-        sendPing();
+          await push(messagesRef, msgData);
+        }
         clearPendingImages(); clearReply();
-        messageInput.value = ''; messageInput.focus();
+        messageInput.value = '';
+        await loadMessages();
+        messageInput.focus();
         return;
       }
 
       if (!text) return;
-      const userId = localStorage.getItem('chatUserId');
-      const msgData = { text, sender: currentUsername, timestamp: serverTimestamp(), userId };
+      const msgData = { text, sender: currentUsername, timestamp: serverTimestamp(), userId: myUserId };
       if (replyTo) msgData.replyTo = replyTo;
-      push(messagesRef, msgData);
-      sendPing();
-      messageInput.value = ''; clearReply(); messageInput.focus();
+      await push(messagesRef, msgData);
+      messageInput.value = ''; clearReply();
+      await loadMessages();
+      messageInput.focus();
     }
 
-    messageInput.addEventListener('keypress', e => {
-      if (e.key === 'Enter') { e.preventDefault(); if (!messageInput.disabled) sendMessage(); }
+    messageInput.addEventListener('keypress', async (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); if (!messageInput.disabled && chatEnabled) await sendMessage(); }
     });
 
     const urlChannel = new URLSearchParams(window.location.search).get('channel');
-    if (urlChannel && urlChannel !== currentChannel) { channelInput.value = urlChannel; channelInput.dispatchEvent(new Event('blur')); }
+    if (urlChannel && urlChannel !== currentChannel) { channelInput.value = urlChannel; await switchChannel(); }
 
     function resizeImageToBase64(file, maxPx = 240, quality = 0.4) {
       return new Promise((resolve) => {
@@ -1015,6 +986,9 @@
     }
     document.getElementById('helpClose').addEventListener('click', closePopup);
     document.getElementById('helpOverlay').addEventListener('click', (e) => { if (e.target === document.getElementById('helpOverlay')) closePopup(); });
+
+    setInterval(loadMessages, 150);
+    loadMessages();
   </script>
 </body>
 </html>

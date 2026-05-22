@@ -678,7 +678,6 @@
       presenceRef = ref(database, `channels/${currentChannel}/presence/${myUserId}`);
       onDisconnect(presenceRef).remove();
 
-      lastMessageKeys.clear();
       await loadMessages();
     }
 
@@ -757,7 +756,6 @@
       updates[`channels/${currentChannel}/presence/${myUserId}`] = { username: newName, userId: myUserId };
       if (Object.keys(updates).length > 0) await update(ref(database), updates);
       
-      lastMessageKeys.clear();
       await loadMessages();
     }
 
@@ -779,7 +777,6 @@
     }
 
     let currentMessages = [];
-    let lastMessageKeys = new Set();
 
     function redrawMessages() {
       messagesDiv.innerHTML = '';
@@ -852,25 +849,14 @@
       if (!chatEnabled) return;
       try {
         const snapshot = await get(messagesRef);
-        const newMessages = [];
-        const newKeys = new Set();
-        
+        const messages = [];
         if (snapshot.exists()) {
           snapshot.forEach((child) => {
-            const msgKey = child.key;
-            newKeys.add(msgKey);
-            newMessages.push({ message: child.val(), msgKey });
+            messages.push({ message: child.val(), msgKey: child.key });
           });
         }
-        
-        const keysEqual = lastMessageKeys.size === newKeys.size && 
-                          [...lastMessageKeys].every(key => newKeys.has(key));
-        
-        if (!keysEqual) {
-          currentMessages = newMessages;
-          lastMessageKeys = newKeys;
-          redrawMessages();
-        }
+        currentMessages = messages;
+        redrawMessages();
       } catch (e) {
         console.error("Error loading messages:", e);
       }
@@ -888,6 +874,7 @@
         }
         clearPendingImages(); clearReply();
         messageInput.value = '';
+        await loadMessages();
         messageInput.focus();
         return;
       }
@@ -897,6 +884,7 @@
       if (replyTo) msgData.replyTo = replyTo;
       await push(messagesRef, msgData);
       messageInput.value = ''; clearReply();
+      await loadMessages();
       messageInput.focus();
     }
 

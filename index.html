@@ -1,248 +1,210 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>First Person Gray Baseplate</title>
-    <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            font-family: monospace;
-        }
-        #cursor-status {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            background: rgba(0,0,0,0.85);
-            color: #0f0;
-            padding: 12px 20px;
-            border-radius: 8px;
-            pointer-events: none;
-            font-size: 18px;
-            z-index: 10;
-            font-family: monospace;
-            border: 2px solid #0f0;
-            font-weight: bold;
-        }
-        #controls {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            background: rgba(0,0,0,0.7);
-            color: white;
-            padding: 8px 15px;
-            border-radius: 8px;
-            pointer-events: none;
-            font-size: 12px;
-            z-index: 10;
-        }
-        canvas {
-            cursor: none;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <title id="websiteTitle">BlueChat</title>
+  <link rel="icon" id="favicon" href="https://res.cloudinary.com/dchf8fggd/image/upload/blue_spiral_yaxhhn.png" />
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    html,body{height:100%;margin:0;padding:0;overflow:hidden;}
+    :root{--primary-blue:#1a73e8;--dark-bg:#0a0a0a;--darker-bg:#121212;--text-light:#e0e0e0;--text-muted:#a0a0a0;--message-user:#1a73e8;--message-friend:#34a853;--glass-bg:rgba(255,255,255,0.05);--glass-border:rgba(255,255,255,0.1);}
+    body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-gradient(135deg,#0a0a0a 0%,#1a1a2e 100%);color:var(--text-light);height:100vh;display:flex;justify-content:center;align-items:center;padding:20px;overflow:hidden;position:relative;}
+    .toggle-group{position:absolute;top:20px;right:20px;display:flex;flex-direction:column;gap:8px;z-index:1000;align-items:flex-end;}
+    .safe-mode-toggle,.notification-toggle{display:flex;align-items:center;gap:8px;background:rgba(0,0,0,0.6);padding:4px 10px;border-radius:20px;backdrop-filter:blur(4px);}
+    .safe-mode-toggle span,.notification-toggle span{font-size:13px;white-space:nowrap;}
+    .toggle-switch{position:relative;display:inline-block;width:40px;height:20px;}
+    .toggle-switch input{opacity:0;width:0;height:0;}
+    .slider{position:absolute;cursor:pointer;inset:0;background-color:#ccc;transition:.4s;border-radius:20px;}
+    .slider:before{position:absolute;content:"";height:12px;width:12px;left:4px;bottom:4px;background-color:white;transition:.4s;border-radius:50%;}
+    input:checked+.slider{background-color:#2196F3;}
+    input:checked+.slider:before{transform:translateX(20px);}
+    .chat-container{width:90%;max-width:600px;background-color:var(--darker-bg);border-radius:16px;box-shadow:0 8px 32px rgba(26,115,232,0.2);overflow:hidden;display:flex;flex-direction:column;height:90vh;max-height:600px;position:relative;}
+    .chat-header{background:linear-gradient(90deg,var(--primary-blue),#0d47a1);color:white;padding:10px 20px;font-size:20px;font-weight:600;display:flex;justify-content:space-between;align-items:center;height:60px;gap:8px;flex-shrink:0;}
+    .chat-header-left{display:flex;align-items:center;}
+    .logo{height:40px;width:40px;margin-right:10px;}
+    .chat-header-right{display:flex;align-items:center;gap:8px;}
+    .header-label{font-size:12px;color:rgba(255,255,255,0.7);white-space:nowrap;}
+    #nameInput,#channelInput{padding:8px 12px;border-radius:20px;border:none;background:rgba(255,255,255,0.2);color:white !important;outline:none;caret-color:transparent;}
+    #nameInput:focus,#channelInput:focus{caret-color:white;}
+    #nameInput{width:120px;}
+    #channelInput{width:70px;}
+    #nameInput::placeholder,#channelInput::placeholder{color:white;opacity:0.7;}
+    .messages-container{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;min-height:0;}
+    .message-wrapper{display:flex;flex-direction:column;max-width:50%;align-self:flex-start;}
+    .sender-name{font-size:14px;color:white;font-weight:bold;margin-bottom:2px;text-align:left;}
+    .sender-name.user{text-align:right;}
+    .sender-name.admin{font-size:16px;color:#bf5fff;text-shadow:0 0 8px rgba(191,95,255,0.6);}
+    .message{padding:12px 16px;border-radius:12px;font-size:15px;line-height:1.4;word-break:break-word;position:relative;box-shadow:0 2px 4px rgba(0,0,0,0.1);}
+    .message.user{align-self:flex-end;background:var(--glass-bg);color:white;border:1px solid var(--message-user);border-top-right-radius:4px;}
+    .message.friend{align-self:flex-start;background:var(--glass-bg);color:white;border:1px solid var(--message-friend);border-top-left-radius:4px;}
+    .message.user::before{content:"";position:absolute;bottom:-8px;right:10px;border-left:8px solid var(--message-user);border-top:8px solid transparent;border-bottom:8px solid transparent;}
+    .message.friend::before{content:"";position:absolute;bottom:-8px;left:10px;border-right:8px solid var(--message-friend);border-top:8px solid transparent;border-bottom:8px solid transparent;}
+    .timestamp{font-size:11px;color:var(--text-muted);margin-top:4px;padding:0 4px;text-align:left;}
+    .timestamp.user{text-align:right;}
+    .input-wrapper{display:flex;align-items:center;background:var(--glass-bg);border-radius:24px;margin:12px;border:1px solid var(--glass-border);flex-shrink:0;}
+    .attach-btn{background:transparent;border:none;border-radius:24px 0 0 24px;width:48px;height:48px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:24px;font-weight:400;color:var(--text-muted);flex-shrink:0;transform:translateY(-2.6px);}
+    .attach-btn:hover{background:transparent;}
+    #messageInput{flex:1;padding:12px 0;border:none;background:transparent;color:var(--text-light);font-size:15px;outline:none;caret-color:var(--text-light);height:48px;}
+    #messageInput::placeholder{color:var(--text-muted);}
+    .messages-container::-webkit-scrollbar{width:8px;}
+    .messages-container::-webkit-scrollbar-track{background:#0a0a0a;}
+    .messages-container::-webkit-scrollbar-thumb{background:var(--primary-blue);border-radius:4px;}
+    .help-link{position:absolute;bottom:16px;right:20px;font-size:12px;color:var(--text-muted);cursor:pointer;text-decoration:underline;z-index:1000;user-select:none;}
+    .help-link:hover{color:var(--text-light);}
+    .popup-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0);z-index:2000;justify-content:center;align-items:center;transition:background 0.25s ease;}
+    .popup-overlay.open{display:flex;background:rgba(0,0,0,0.6);}
+    .popup{background:#121212;border:1px solid rgba(255,255,255,0.1);border-radius:16px;box-shadow:0 8px 32px rgba(26,115,232,0.25);width:90%;max-width:420px;overflow:hidden;transform:scale(0.88) translateY(16px);opacity:0;transition:transform 0.25s cubic-bezier(0.34,1.56,0.64,1),opacity 0.2s ease;}
+    .popup-overlay.open .popup{transform:scale(1) translateY(0);opacity:1;}
+    .popup-header{background:linear-gradient(90deg,var(--primary-blue),#0d47a1);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;}
+    .popup-header span{font-size:17px;font-weight:600;color:white;}
+    .popup-close{background:rgba(255,255,255,0.2);border:none;color:white;font-size:16px;width:28px;height:28px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;}
+    .popup-close:hover{background:rgba(255,255,255,0.35);}
+    .popup-body{padding:20px;display:flex;flex-direction:column;gap:12px;max-height:70vh;overflow-y:auto;}
+    .popup-subheading{font-size:11px;font-weight:600;color:var(--primary-blue);text-transform:uppercase;letter-spacing:0.6px;margin-top:4px;}
+    .popup-item{display:flex;gap:12px;align-items:flex-start;}
+    .popup-icon{font-size:18px;width:26px;flex-shrink:0;text-align:center;margin-top:1px;}
+    .popup-text{font-size:13px;color:var(--text-muted);line-height:1.5;}
+    .popup-text strong{color:var(--text-light);}
+    .reply-bar{display:none;align-items:center;gap:8px;padding:6px 14px;background:rgba(26,115,232,0.1);border-top:1px solid rgba(26,115,232,0.25);font-size:12px;color:var(--text-muted);}
+    .reply-bar.active{display:flex;}
+    .reply-bar-text{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+    .reply-bar-text strong{color:#8ab4f8;font-size:12px;}
+    .reply-cancel{background:none;border:none;color:var(--text-muted);font-size:14px;cursor:pointer;padding:0;line-height:1;flex-shrink:0;}
+    .reply-cancel:hover{color:var(--text-light);}
+    .reply-quote{border-left:2px solid rgba(138,180,248,0.5);padding:2px 7px;margin-bottom:5px;font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .reply-quote-sender{color:#8ab4f8;font-weight:600;margin-right:4px;}
+    @keyframes msg-flash{0%{box-shadow:0 0 0 2px rgba(26,115,232,0.9),inset 0 0 0 9999px rgba(26,115,232,0.22);}100%{box-shadow:none;}}
+    .message.flash{animation:msg-flash 0.7s ease forwards;}
+    .msg-image{max-width:100%;max-height:260px;border-radius:8px;display:block;cursor:pointer;}
+    .drop-overlay{display:none;position:fixed;inset:0;background:rgba(26,115,232,0.18);border:3px dashed var(--primary-blue);z-index:4000;justify-content:center;align-items:center;font-size:18px;color:#8ab4f8;font-weight:600;pointer-events:none;}
+    .drop-overlay.active{display:flex;}
+    .image-preview-bar{display:none;align-items:center;gap:10px;padding:8px 14px;background:rgba(255,255,255,0.04);border-top:1px solid var(--glass-border);flex-shrink:0;}
+    .image-preview-bar.active{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+    .image-preview-thumb{height:48px;width:48px;object-fit:cover;border-radius:6px;border:1px solid var(--glass-border);}
+    .image-preview-label{flex:1;font-size:12px;color:var(--text-muted);min-width:120px;}
+    .image-preview-cancel{background:none;border:none;color:var(--text-muted);font-size:16px;cursor:pointer;padding:0;line-height:1;}
+    .preview-thumb-wrap{position:relative;display:inline-block;}
+    .preview-thumb-wrap .rm-btn{position:absolute;top:-5px;right:-5px;background:#b71c1c;border:none;color:white;font-size:10px;width:16px;height:16px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+    .lightbox-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.94);z-index:5000;justify-content:center;align-items:center;backdrop-filter:blur(8px);}
+    .lightbox-overlay.open{display:flex;}
+    .lightbox-img{max-width:95vw;max-height:95vh;width:auto;height:auto;min-width:65vw;object-fit:contain;border-radius:12px;cursor:pointer;}
+    @media(min-width:700px){.lightbox-img{max-width:88vw;max-height:92vh;min-width:70vw;}}
+    .lightbox-close{position:fixed;top:24px;right:28px;background:rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.3);color:white;font-size:26px;width:48px;height:48px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:5001;}
+    .lightbox-close:hover{background:#b71c1c;}
+    @media(max-width:550px){body{padding:10px;}.chat-container{width:100%;max-height:85vh;}.chat-header{padding:8px 12px;height:auto;min-height:50px;flex-wrap:wrap;}.chat-header-left{flex-shrink:0;}.chat-header-right{flex-wrap:wrap;justify-content:flex-end;gap:6px;}#nameInput{width:80px;padding:5px 8px;font-size:11px;}#channelInput{width:55px;padding:5px 8px;font-size:11px;}.header-label{font-size:10px;}.message-wrapper{max-width:70%;}.toggle-group{top:7px;right:10px;gap:6px;}.safe-mode-toggle span,.notification-toggle span{font-size:11px;}.safe-mode-toggle,.notification-toggle{padding:3px 8px;gap:5px;}.toggle-switch{width:34px;height:18px;}.slider:before{height:10px;width:10px;left:3px;bottom:4px;}input:checked+.slider:before{transform:translateX(16px);}.help-link{bottom:10px;right:12px;font-size:10px;}.attach-btn{width:44px;height:44px;font-size:22px;}#messageInput{height:44px;}}
+    @media(max-width:480px){.chat-header{flex-direction:column;align-items:stretch;gap:6px;}.chat-header-left{justify-content:center;}.chat-header-right{justify-content:center;}.toggle-group{top:5px;right:5px;}}
+    @supports (padding: max(0px)) {
+      body { padding-left: max(20px, env(safe-area-inset-left)); padding-right: max(20px, env(safe-area-inset-right)); padding-top: max(20px, env(safe-area-inset-top)); padding-bottom: max(20px, env(safe-area-inset-bottom)); }
+      .chat-container { margin-top: env(safe-area-inset-top); margin-bottom: env(safe-area-inset-bottom); }
+      .toggle-group { top: max(20px, env(safe-area-inset-top)); right: max(20px, env(safe-area-inset-right)); }
+      .help-link { bottom: max(16px, env(safe-area-inset-bottom)); right: max(20px, env(safe-area-inset-right)); }
+    }
+  </style>
 </head>
 <body>
-    <div id="cursor-status">
-        🖱️ CURSOR X: <span id="cursor-x">---</span> | Y: <span id="cursor-y">---</span>
-    </div>
-    <div id="controls">🎮 MOVE MOUSE TO TURN | WASD / ARROWS to move | ESC to unlock</div>
-
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.128.0/build/three.module.js"
-            }
-        }
-    </script>
-
-    <script type="module">
-        import * as THREE from 'three';
-
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x111111);
-        scene.fog = new THREE.FogExp2(0x111111, 0.008);
-
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 1.6, 2);
-        
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
-        document.body.appendChild(renderer.domElement);
-
-        const baseplateGeometry = new THREE.PlaneGeometry(30, 30);
-        const baseplateMaterial = new THREE.MeshStandardMaterial({ color: 0x9a9a9a, roughness: 0.6, metalness: 0.05, side: THREE.DoubleSide });
-        const baseplate = new THREE.Mesh(baseplateGeometry, baseplateMaterial);
-        baseplate.rotation.x = -Math.PI / 2;
-        baseplate.position.y = -0.05;
-        baseplate.receiveShadow = true;
-        scene.add(baseplate);
-
-        const gridHelper = new THREE.GridHelper(30, 20, 0xc0c0c0, 0x808080);
-        gridHelper.position.y = -0.04;
-        gridHelper.material.transparent = true;
-        gridHelper.material.opacity = 0.5;
-        scene.add(gridHelper);
-
-        const ambientLight = new THREE.AmbientLight(0x8a8a8a, 0.85);
-        scene.add(ambientLight);
-        
-        const fillLight = new THREE.PointLight(0xccaa88, 0.7);
-        fillLight.position.set(-3, 5, 3);
-        scene.add(fillLight);
-        
-        const backLight = new THREE.PointLight(0x88aacc, 0.5);
-        backLight.position.set(0, 4, -6);
-        scene.add(backLight);
-        
-        const rimLight = new THREE.PointLight(0xddbb99, 0.6);
-        rimLight.position.set(3, 3, -4);
-        scene.add(rimLight);
-        
-        const topFill = new THREE.PointLight(0xccaa99, 0.55);
-        topFill.position.set(0, 6, 0);
-        scene.add(topFill);
-
-        let yaw = 0;
-        let pitch = 0;
-        let isLocked = false;
-        let centerX = Math.floor(window.innerWidth / 2);
-        let centerY = Math.floor(window.innerHeight / 2);
-        
-        const cursorXSpan = document.getElementById('cursor-x');
-        const cursorYSpan = document.getElementById('cursor-y');
-        
-        function updateCenterCoordinates() {
-            centerX = Math.floor(window.innerWidth / 2);
-            centerY = Math.floor(window.innerHeight / 2);
-            if (isLocked) {
-                cursorXSpan.textContent = centerX;
-                cursorYSpan.textContent = centerY;
-            }
-        }
-        
-        window.addEventListener('resize', () => {
-            updateCenterCoordinates();
-        });
-        
-        renderer.domElement.addEventListener('click', () => {
-            renderer.domElement.requestPointerLock();
-        });
-        
-        document.addEventListener('pointerlockchange', lockChange);
-        document.addEventListener('mozpointerlockchange', lockChange);
-        
-        function lockChange() {
-            if (document.pointerLockElement === renderer.domElement) {
-                isLocked = true;
-                document.addEventListener('mousemove', onMouseMove);
-                renderer.domElement.style.cursor = 'none';
-                updateCenterCoordinates();
-            } else {
-                isLocked = false;
-                document.removeEventListener('mousemove', onMouseMove);
-                renderer.domElement.style.cursor = 'default';
-                cursorXSpan.textContent = '---';
-                cursorYSpan.textContent = '---';
-            }
-        }
-        
-        function onMouseMove(event) {
-            if (!isLocked) return;
-            
-            const sensitivity = 0.0035;
-            yaw -= event.movementX * sensitivity;
-            pitch -= event.movementY * sensitivity;
-            
-            pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, pitch));
-            
-            camera.rotation.order = 'YXZ';
-            camera.rotation.y = yaw;
-            camera.rotation.x = pitch;
-            
-            cursorXSpan.textContent = centerX;
-            cursorYSpan.textContent = centerY;
-        }
-        
-        const keys = {
-            ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false,
-            KeyW: false, KeyS: false, KeyA: false, KeyD: false
-        };
-        
-        window.addEventListener('keydown', (e) => {
-            if (keys.hasOwnProperty(e.code)) {
-                keys[e.code] = true;
-                e.preventDefault();
-            }
-        });
-        
-        window.addEventListener('keyup', (e) => {
-            if (keys.hasOwnProperty(e.code)) {
-                keys[e.code] = false;
-                e.preventDefault();
-            }
-        });
-        
-        const moveSpeed = 7.0;
-        
-        function updateMovement(deltaTime) {
-            const moveForward = keys.ArrowUp || keys.KeyW;
-            const moveBack = keys.ArrowDown || keys.KeyS;
-            const moveLeft = keys.ArrowLeft || keys.KeyA;
-            const moveRight = keys.ArrowRight || keys.KeyD;
-            
-            const actualSpeed = moveSpeed * deltaTime;
-            
-            const forward = new THREE.Vector3();
-            const right = new THREE.Vector3();
-            
-            camera.getWorldDirection(forward);
-            forward.y = 0;
-            forward.normalize();
-            
-            right.crossVectors(new THREE.Vector3(0, 1, 0), forward);
-            right.normalize();
-            
-            let moveDelta = new THREE.Vector3(0, 0, 0);
-            if (moveForward) moveDelta.z -= actualSpeed;
-            if (moveBack) moveDelta.z += actualSpeed;
-            if (moveLeft) moveDelta.x -= actualSpeed;
-            if (moveRight) moveDelta.x += actualSpeed;
-            
-            moveDelta.applyQuaternion(camera.quaternion);
-            moveDelta.y = 0;
-            
-            camera.position.x += moveDelta.x;
-            camera.position.z += moveDelta.z;
-            
-            const limit = 13.5;
-            camera.position.x = Math.max(-limit, Math.min(limit, camera.position.x));
-            camera.position.z = Math.max(-limit, Math.min(limit, camera.position.z));
-        }
-        
-        let lastTime = performance.now();
-        
-        function animate() {
-            const now = performance.now();
-            let delta = Math.min(0.033, (now - lastTime) / 1000);
-            lastTime = now;
-            
-            updateMovement(delta);
-            
-            renderer.render(scene, camera);
-            requestAnimationFrame(animate);
-        }
-        
-        window.addEventListener('resize', onWindowResize, false);
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            updateCenterCoordinates();
-        }
-        
-        animate();
-    </script>
+  <div class="toggle-group">
+    <div class="safe-mode-toggle"><span>Safe Mode</span><label class="toggle-switch"><input type="checkbox" id="safeModeToggle"><span class="slider"></span></label></div>
+    <div class="notification-toggle"><span>Notification</span><label class="toggle-switch"><input type="checkbox" id="notificationToggle"><span class="slider"></span></label></div>
+  </div>
+  <div class="drop-overlay" id="dropOverlay">📷 Drop image to send</div>
+  <span class="help-link" id="helpLink">How to use</span>
+  <div class="popup-overlay" id="helpOverlay"><div class="popup"><div class="popup-header"><span>How to Use BlueChat</span><button class="popup-close" id="helpClose">✕</button></div><div class="popup-body"><div class="popup-item"><div class="popup-icon">💬</div><div class="popup-text"><strong>Sending a message</strong><br>Click the input bar at the bottom, type your message, and press Enter.</div></div><div class="popup-item"><div class="popup-icon">👤</div><div class="popup-text"><strong>Changing your username</strong><br>Click the username box in the header, type your new name, and press Enter or click away. Your name must be unique in the channel you're in.</div></div><div class="popup-item"><div class="popup-icon">#</div><div class="popup-text"><strong>Joining a channel</strong><br>Type a channel name or number in the Channel box and press Enter. Share the same channel name with a friend to chat together. You start in channel 1.</div></div><div class="popup-item"><div class="popup-icon">↩</div><div class="popup-text"><strong>Replying to a message</strong><br>Right-click any message bubble to reply to it. A bar appears above the input showing who you're replying to — press ✕ or Escape to cancel.</div></div><div class="popup-subheading">⚙ Quick Toggles</div><div class="popup-item"><div class="popup-icon">🔒</div><div class="popup-text"><strong>Safe Mode</strong><br>Flip this on to make the tab look like Google — handy if you need to hide the page quickly.</div></div><div class="popup-item"><div class="popup-icon">🔔</div><div class="popup-text"><strong>Notification</strong><br>Turn this on to receive desktop notifications when new messages arrive (when tab is not focused).</div></div></div></div></div>
+  <div class="chat-container">
+    <div class="chat-header"><div class="chat-header-left"><img src="https://res.cloudinary.com/dchf8fggd/image/upload/white_spiral_tuzhsy.png" alt="Logo" class="logo" /><span>BlueChat</span></div><div class="chat-header-right"><span class="header-label">Channel</span><input type="text" id="channelInput" placeholder="Channel..." value="1" maxlength="20" /><span class="header-label">Username</span><input type="text" id="nameInput" placeholder="Username..." value="User1234" maxlength="20" /></div></div>
+    <div class="messages-container" id="messages"></div>
+    <div id="usernameNotif" style="display:none; background:#b71c1c; color:white; font-size:13px; text-align:center; padding:6px 12px;"></div>
+    <div id="channelNotif" style="display:none; background:#b71c1c; color:white; font-size:13px; text-align:center; padding:6px 12px;">Username taken in that channel. Change your username first.</div>
+    <div class="lightbox-overlay" id="lightboxOverlay"><button class="lightbox-close" id="lightboxClose">✕</button><img class="lightbox-img" id="lightboxImg" src="" alt="" /></div>
+    <div class="image-preview-bar" id="imagePreviewBar"><div id="imageThumbsRow" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"></div><span class="image-preview-label" id="imagePreviewLabel"></span><button class="image-preview-cancel" id="imagePreviewCancel">✕</button></div>
+    <div class="reply-bar" id="replyBar"><div class="reply-bar-text">↩ <strong id="replyBarSender"></strong>: <span id="replyBarPreview"></span></div><button class="reply-cancel" id="replyCancel">✕</button></div>
+    <div class="input-wrapper"><div class="attach-btn" id="attachBtn" title="Attach image">+</div><input type="text" id="messageInput" placeholder="Type your message here..." autocomplete="off" /></div>
+    <input type="file" id="fileInput" accept="image/*" multiple style="display: none;" />
+  </div>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
+    import { getDatabase, ref, push, onValue, off, get, remove, serverTimestamp, update, onDisconnect, runTransaction } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-database.js";
+    const firebaseConfig = { apiKey: "AIzaSyBaZTSXexzHIk9uYXGkQBxuHv8YEjXb2H4", authDomain: "newchat-4067d.firebaseapp.com", databaseURL: "https://newchat-4067d-default-rtdb.asia-southeast1.firebasedatabase.app", projectId: "newchat-4067d", storageBucket: "newchat-4067d.firebasestorage.app", messagingSenderId: "35659871822", appId: "1:35659871822:web:a29443ab5f0105622eb51f" };
+    const app = initializeApp(firebaseConfig);
+    const database = getDatabase(app);
+    const messagesDiv = document.getElementById('messages');
+    const messageInput = document.getElementById('messageInput');
+    const nameInput = document.getElementById('nameInput');
+    const channelInput = document.getElementById('channelInput');
+    const safeModeToggle = document.getElementById('safeModeToggle');
+    const notificationToggle = document.getElementById('notificationToggle');
+    const websiteTitle = document.getElementById('websiteTitle');
+    const favicon = document.getElementById('favicon');
+    const attachBtn = document.getElementById('attachBtn');
+    const fileInput = document.getElementById('fileInput');
+    attachBtn.addEventListener('click',()=>fileInput.click());
+    fileInput.addEventListener('change',async(e)=>{for(const f of Array.from(e.target.files))if(f.type.startsWith('image/'))await stageImage(f);fileInput.value='';});
+    const chatEnabledRef = ref(database,'settings/chatEnabled'); let chatDraft='';
+    onValue(chatEnabledRef,(snap)=>{const e=snap.exists()?snap.val():true;if(!e){chatDraft=messageInput.value;messageInput.value='';messageInput.blur();messageInput.disabled=true;messageInput.placeholder='Chat is currently disabled.';nameInput.disabled=true;nameInput.style.opacity='0.4';}else{messageInput.disabled=false;messageInput.placeholder='Type your message here...';if(chatDraft){messageInput.value=chatDraft;chatDraft='';}nameInput.disabled=false;nameInput.style.opacity='';}});
+    function getChanUsername(c){return localStorage.getItem(`chatUsername_${c}`);}
+    function setChanUsername(c,n){localStorage.setItem(`chatUsername_${c}`,n);}
+    function getDefaultUsername(c){const s=getChanUsername(c);if(s)return s;let u=localStorage.getItem('chatUserId');if(!u){u=Date.now().toString(36)+Math.random().toString(36).slice(2,6);localStorage.setItem('chatUserId',u);}const n='User'+(parseInt(u.slice(-4),36)%9000+1000);setChanUsername(c,n);return n;}
+    let currentChannel=localStorage.getItem('chatChannel')||'1';channelInput.value=currentChannel;
+    let currentUsername=getDefaultUsername(currentChannel);nameInput.value=currentUsername;
+    let messagesRef=ref(database,`channels/${currentChannel}/messages`);
+    const myUserId=localStorage.getItem('chatUserId');let presenceRef=ref(database,`channels/${currentChannel}/presence/${myUserId}`);
+    async function tryJoinChannel(channel){const p=ref(database,`channels/${channel}/presence`);let conflict=false;await runTransaction(p,(pres)=>{pres=pres||{};for(const u in pres)if(pres[u].username===currentUsername&&u!==myUserId)conflict=true;if(!conflict)pres[myUserId]={username:currentUsername,userId:myUserId};return pres;});if(!conflict){const all=await get(ref(database,'channels'));const clean={};if(all.exists())all.forEach(ch=>{if(ch.key!==channel)clean[`channels/${ch.key}/presence/${myUserId}`]=null;});if(Object.keys(clean).length)await update(ref(database),clean);onDisconnect(ref(database,`channels/${channel}/presence/${myUserId}`)).remove();}return !conflict;}
+    tryJoinChannel(currentChannel);
+    const savedSafeMode=localStorage.getItem('safeMode')==='true';safeModeToggle.checked=savedSafeMode;
+    const updateSafeModeUI=e=>{if(e){websiteTitle.textContent="Google";favicon.href="https://www.google.com/favicon.ico";}else{websiteTitle.textContent="BlueChat";favicon.href="https://res.cloudinary.com/dchf8fggd/image/upload/blue_spiral_yaxhhn.png";}};
+    updateSafeModeUI(savedSafeMode);
+    safeModeToggle.addEventListener('change',e=>{localStorage.setItem('safeMode',e.target.checked);updateSafeModeUI(e.target.checked);});
+    const savedNotification=localStorage.getItem('notificationEnabled')!=='false';notificationToggle.checked=savedNotification;let notificationsEnabled=savedNotification;
+    notificationToggle.addEventListener('change',e=>{notificationsEnabled=e.target.checked;localStorage.setItem('notificationEnabled',notificationsEnabled);if(notificationsEnabled&&"Notification"in window&&Notification.permission==="default")Notification.requestPermission();});
+    nameInput.addEventListener('input',function(){if(this.value.length>20)this.value=this.value.slice(0,20);});
+    nameInput.addEventListener('blur',()=>updateUsername());
+    nameInput.addEventListener('keypress',e=>{if(e.key==='Enter'){e.preventDefault();nameInput.blur();}});
+    channelInput.addEventListener('blur',()=>switchChannel());
+    channelInput.addEventListener('keypress',e=>{if(e.key==='Enter'){e.preventDefault();channelInput.blur();}});
+    const channelNotif=document.getElementById('channelNotif');
+    function showChannelNotif(m){channelNotif.textContent=m||'Username taken.';channelNotif.style.display='block';clearTimeout(channelNotif._timer);channelNotif._timer=setTimeout(()=>channelNotif.style.display='none',3500);}
+    async function switchChannel(){const nc=channelInput.value.trim()||'1';if(nc===currentChannel)return;setChanUsername(currentChannel,currentUsername);const sn=getChanUsername(nc)||currentUsername,pu=currentUsername;currentUsername=sn;const a=await tryJoinChannel(nc);if(!a){currentUsername=pu;channelInput.value=currentChannel;showChannelNotif(`Username "${sn}" already in use.`);return;}nameInput.value=currentUsername;off(messagesRef);const oc=currentChannel;currentChannel=nc;localStorage.setItem('chatChannel',currentChannel);messagesRef=ref(database,`channels/${currentChannel}/messages`);lastSnapshot=null;clearReply();await remove(ref(database,`channels/${oc}/presence/${myUserId}`));renderMessages();}
+    const replyBar=document.getElementById('replyBar'),replyBarSender=document.getElementById('replyBarSender'),replyBarPreview=document.getElementById('replyBarPreview'),replyCancel=document.getElementById('replyCancel');let replyTo=null;
+    function setReply(s,p,_,k){replyTo={sender:s,text:p,msgKey:k};replyBarSender.textContent=s;replyBarPreview.textContent=p.length>60?p.slice(0,60)+'…':p;replyBar.classList.add('active');messageInput.focus();}
+    function clearReply(){replyTo=null;replyBar.classList.remove('active');}
+    replyCancel.addEventListener('click',clearReply);document.addEventListener('keydown',e=>{if(e.key==='Escape')clearReply();});document.addEventListener('contextmenu',e=>e.preventDefault());
+    function showUsernameNotif(m){const e=document.getElementById('usernameNotif');e.textContent=m;e.style.display='block';clearTimeout(e._timer);e._timer=setTimeout(()=>e.style.display='none',3000);}
+    async function updateUsername(){const nn=nameInput.value.trim()||'User1234';if(nn===currentUsername)return;if(nn.toLowerCase()==='[admin]'||nn.toLowerCase()==='admin'){nameInput.value=currentUsername;showUsernameNotif('Reserved.');return;}const p=ref(database,`channels/${currentChannel}/presence`);let t=false;await runTransaction(p,pr=>{pr=pr||{};for(const u in pr)if(pr[u].username===nn&&u!==myUserId)t=true;if(!t&&pr[myUserId])pr[myUserId].username=nn;return pr;});if(t){nameInput.value=currentUsername;showUsernameNotif('Username taken.');return;}const ou=currentUsername;currentUsername=nn;setChanUsername(currentChannel,nn);renaming=true;const sr=replyTo;redrawMessages(ou);try{const s=await get(messagesRef),up={};s.forEach(ms=>{const m=ms.val();if(m.userId===myUserId||(!m.userId&&m.sender===ou))up[`channels/${currentChannel}/messages/${ms.key}`]={text:m.text,sender:nn,timestamp:m.timestamp,userId:myUserId,...(m.replyTo&&{replyTo:m.replyTo}),...(m.isImage&&{isImage:true})};});up[`channels/${currentChannel}/presence/${myUserId}`]={username:nn,userId:myUserId};if(Object.keys(up).length)await update(ref(database),up);lastSnapshot=await get(messagesRef);renaming=false;replyTo=sr;redrawMessages();}catch(e){currentUsername=ou;nameInput.value=ou;setChanUsername(currentChannel,ou);renaming=false;replyTo=sr;redrawMessages();}}
+    function makeLinksClickable(t){return t.replace(/(https?:\/\/[^\s]+)/g,u=>`<a href="${u}" target="_blank" rel="noopener noreferrer" style="color:#8ab4f8;text-decoration:underline;">${u}</a>`);}
+    function formatTimestamp(ts){return new Date(ts).toLocaleTimeString('en-US',{timeZone:'Australia/Brisbane',hour12:false,hour:'2-digit',minute:'2-digit'});}
+    let lastSnapshot=null,renaming=false,lastNotifiedMsgCount=0,notificationPermissionGranted=false;
+    function requestNotificationPermission(){if(notificationsEnabled&&"Notification"in window&&Notification.permission==="default")Notification.requestPermission().then(p=>notificationPermissionGranted=p==="granted");else if("Notification"in window&&Notification.permission==="granted")notificationPermissionGranted=true;}
+    function sendExternalNotification(sender,text,isImg){if(!notificationsEnabled||!notificationPermissionGranted||document.hasFocus())return;new Notification(`Channel: ${currentChannel}`,{body:`${sender}: ${isImg?"📷 Image attached":(text.length>70?text.slice(0,70)+'…':text)}`,icon:"https://res.cloudinary.com/dchf8fggd/image/upload/blue_spiral_yaxhhn.png",tag:"bluechat-message",renotify:true});}
+    if(notificationsEnabled)requestNotificationPermission();if("Notification"in window&&Notification.permission==="granted")notificationPermissionGranted=true;
+    function redrawMessages(displayName){if(!lastSnapshot)return;const name=displayName||currentUsername;messagesDiv.innerHTML='';let idx=0;lastSnapshot.forEach(c=>{const m=c.val(),k=c.key,isU=m.userId===myUserId||(!m.userId&&(m.sender===name||m.sender===currentUsername)),wrap=document.createElement('div');wrap.className='message-wrapper';wrap.dataset.msgKey=k;wrap.style.alignSelf=isU?'flex-end':'flex-start';const s=document.createElement('div');s.className='sender-name'+(isU?' user':'');if(m.sender==='[Admin]')s.classList.add('admin');s.textContent=m.sender;const t=document.createElement('div');t.className='message '+(isU?'user':'friend');if(m.replyTo){const q=document.createElement('div');q.className='reply-quote';q.style.cursor='pointer';const qt=m.replyTo.text?.startsWith('data:')?'[Image]':(m.replyTo.text?.length>60?m.replyTo.text.slice(0,60)+'…':m.replyTo.text);q.innerHTML=`<span class="reply-quote-sender">${m.replyTo.sender}</span><span class="reply-quote-text">${qt}</span>`;if(m.replyTo.msgKey)q.addEventListener('click',()=>{const tg=messagesDiv.querySelector(`[data-msg-key="${m.replyTo.msgKey}"]`);if(tg){tg.scrollIntoView({behavior:'smooth',block:'center'});const b=tg.querySelector('.message');if(b){b.classList.remove('flash');void b.offsetWidth;b.classList.add('flash');setTimeout(()=>b.classList.remove('flash'),700);}}});t.appendChild(q);}const sp=document.createElement('span'),isImg=m.isImage||(m.text&&m.text.startsWith('data:image'));if(isImg){const img=document.createElement('img');img.src=m.text;img.className='msg-image';img.onclick=()=>openLightbox(m.text);sp.appendChild(img);}else sp.innerHTML=makeLinksClickable(m.text);t.appendChild(sp);t.addEventListener('contextmenu',e=>{e.preventDefault();if(replyTo?.msgKey===k)clearReply();else setReply(m.sender,m.isImage?'[Image]':m.text,null,k);});const tm=document.createElement('div');tm.className='timestamp'+(isU?' user':'');tm.textContent=formatTimestamp(m.timestamp);wrap.append(s,t,tm);messagesDiv.appendChild(wrap);idx++;});messagesDiv.scrollTop=messagesDiv.scrollHeight;if(lastSnapshot&&!renaming){const cur=lastSnapshot.size;if(lastNotifiedMsgCount>0&&cur>lastNotifiedMsgCount){const nm=[];let i=0;lastSnapshot.forEach(c=>{if(i>=lastNotifiedMsgCount)nm.push(c.val());i++;});for(const nm2 of nm)if(nm2.userId!==myUserId&&nm2.sender!==currentUsername)sendExternalNotification(nm2.sender,nm2.text,nm2.isImage);}lastNotifiedMsgCount=cur;}}
+    function renderMessages(){onValue(messagesRef,snap=>{lastSnapshot=snap;if(!renaming)redrawMessages();});}
+    renderMessages();
+    function sendMessage(){if(messageInput.disabled)return;const txt=messageInput.value.trim();if(pendingImages.length){for(let imgData of pendingImages){push(messagesRef,{text:imgData,sender:currentUsername,timestamp:serverTimestamp(),userId:myUserId,isImage:true,...(replyTo&&{replyTo})});}clearPending();clearReply();messageInput.value='';messageInput.focus();return;}if(!txt)return;push(messagesRef,{text:txt,sender:currentUsername,timestamp:serverTimestamp(),userId:myUserId,...(replyTo&&{replyTo})});messageInput.value='';clearReply();messageInput.focus();}
+    messageInput.addEventListener('keypress',e=>{if(e.key==='Enter'){e.preventDefault();if(!messageInput.disabled)sendMessage();}});
+    const urlChan=new URLSearchParams(location.search).get('channel');if(urlChan&&urlChan!==currentChannel){channelInput.value=urlChan;channelInput.dispatchEvent(new Event('blur'));}
+    function resizeImageToBase64(f){return new Promise(r=>{const rd=new FileReader();rd.onload=e=>{const img=new Image();img.onload=()=>{let w=img.width,h=img.height;if(w>2000){h=(h/w)*2000;w=2000;}const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);r(c.toDataURL('image/jpeg',0.85));};img.src=e.target.result;};rd.readAsDataURL(f);});}
+    const imgBar=document.getElementById('imagePreviewBar'),imgRow=document.getElementById('imageThumbsRow'),imgLabel=document.getElementById('imagePreviewLabel'),imgCancel=document.getElementById('imagePreviewCancel');let pendingImages=[];
+    function renderThumbs(){imgRow.innerHTML='';pendingImages.forEach((d,i)=>{const w=document.createElement('div');w.className='preview-thumb-wrap';const t=document.createElement('img');t.className='image-preview-thumb';t.src=d;const rm=document.createElement('button');rm.className='rm-btn';rm.textContent='✕';rm.onclick=()=>{pendingImages.splice(i,1);if(pendingImages.length)renderThumbs();else clearPending();};w.append(t,rm);imgRow.appendChild(w);});imgLabel.textContent=`${pendingImages.length} image(s) ready — press Enter`;}
+    function clearPending(){pendingImages=[];imgRow.innerHTML='';imgBar.classList.remove('active');}
+    imgCancel.addEventListener('click',clearPending);
+    async function stageImage(f){if(!f.type.startsWith('image/'))return;const d=await resizeImageToBase64(f);pendingImages.push(d);renderThumbs();imgBar.classList.add('active');messageInput.focus();}
+    const lbOverlay=document.getElementById('lightboxOverlay'),lbImg=document.getElementById('lightboxImg'),lbClose=document.getElementById('lightboxClose');
+    function openLightbox(s){lbImg.src=s;lbOverlay.classList.add('open');}
+    lbClose.addEventListener('click',()=>lbOverlay.classList.remove('open'));lbOverlay.addEventListener('click',e=>{if(e.target===lbOverlay)lbOverlay.classList.remove('open');});
+    const dropOverlay=document.getElementById('dropOverlay');let dc=0;
+    document.addEventListener('dragenter',e=>{if([...e.dataTransfer.items].some(i=>i.kind==='file'&&i.type.startsWith('image/'))){dc++;dropOverlay.classList.add('active');}});
+    document.addEventListener('dragleave',()=>{dc--;if(dc<=0)dropOverlay.classList.remove('active');});
+    document.addEventListener('dragover',e=>e.preventDefault());
+    document.addEventListener('drop',e=>{e.preventDefault();dc=0;dropOverlay.classList.remove('active');const f=[...e.dataTransfer.files].find(f=>f.type.startsWith('image/'));if(f)stageImage(f);});
+    messageInput.addEventListener('paste',e=>{const f=[...e.clipboardData.items].find(i=>i.kind==='file'&&i.type.startsWith('image/'));if(f){e.preventDefault();stageImage(f.getAsFile());}});
+    document.getElementById('helpLink').addEventListener('click',()=>{const o=document.getElementById('helpOverlay');o.style.display='flex';requestAnimationFrame(()=>o.classList.add('open'));});
+    const closePopup=()=>{const o=document.getElementById('helpOverlay');o.classList.remove('open');setTimeout(()=>o.style.display='none',260);};
+    document.getElementById('helpClose').addEventListener('click',closePopup);
+    document.getElementById('helpOverlay').addEventListener('click',e=>{if(e.target===document.getElementById('helpOverlay'))closePopup();});
+    document.addEventListener('keydown', function(e) {
+      if (e.target === nameInput || e.target === messageInput || e.target === channelInput) return;
+      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) messageInput.focus();
+    });
+  </script>
 </body>
 </html>
